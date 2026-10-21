@@ -1,5 +1,6 @@
 package it_service_desk_api.entities;
 
+import it_service_desk_api.entities.enums.Roles;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -25,6 +26,15 @@ public class Users {
     @Column (nullable = false)
     private String password;
 
+    @Enumerated (EnumType.STRING)
     @Column (nullable = false)
     private Roles role;
+
+    public Users (String name, String email, String password, Roles role) {
+        this.name = name;
+        this.email = email;
+        this.password = password;
+        this.role = role;
+    } // end of constructor
+
 } // end of class body
