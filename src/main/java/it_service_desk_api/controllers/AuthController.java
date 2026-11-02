@@ -4,7 +4,9 @@ import it_service_desk_api.dtos.users_dtos.requests.LoginRequest;
 import it_service_desk_api.dtos.users_dtos.requests.NewUserRequest;
 import it_service_desk_api.dtos.users_dtos.responses.AuthResponse;
 import it_service_desk_api.dtos.users_dtos.responses.UserResponse;
+import it_service_desk_api.services.AuthRateLimiter;
 import it_service_desk_api.services.AuthService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,20 +20,27 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final AuthRateLimiter authRateLimiter;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, AuthRateLimiter authRateLimiter) {
         this.authService = authService;
+        this.authRateLimiter = authRateLimiter;
     } // end of constructor
 
     // This public endpoint creates a standard USER account with an encoded password.
     @PostMapping("/register")
-    public ResponseEntity<UserResponse> register(@Valid @RequestBody NewUserRequest request) {
+    public ResponseEntity<UserResponse> register(
+            @Valid @RequestBody NewUserRequest request,
+            HttpServletRequest servletRequest
+    ) {
+        authRateLimiter.checkRegistrationAttempt(servletRequest.getRemoteAddr());
         return ResponseEntity.status(HttpStatus.CREATED).body(authService.register(request));
     } // end of register method
 
     // This public endpoint validates credentials and returns a bearer token.
     @PostMapping("/login")
-    public AuthResponse login(@Valid @RequestBody LoginRequest request) {
+    public AuthResponse login(@Valid @RequestBody LoginRequest request, HttpServletRequest servletRequest) {
+        authRateLimiter.checkLoginAttempt(servletRequest.getRemoteAddr());
         return authService.login(request);
     } // end of login method
 } // end of class body

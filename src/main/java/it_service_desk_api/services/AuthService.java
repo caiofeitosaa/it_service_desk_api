@@ -8,6 +8,7 @@ import it_service_desk_api.entities.Users;
 import it_service_desk_api.entities.enums.Roles;
 import it_service_desk_api.repositories.UsersRepository;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationServiceException;
@@ -22,11 +23,14 @@ import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Locale;
 
 @Service
 public class AuthService {
+
+    private static final int BCRYPT_MAX_PASSWORD_BYTES = 72;
 
     private final UsersRepository usersRepository;
     private final PasswordEncoder passwordEncoder;
@@ -52,6 +56,10 @@ public class AuthService {
     public UserResponse register(NewUserRequest request) {
         String email = normalizeEmail(request.email());
 
+        if (request.password().getBytes(StandardCharsets.UTF_8).length > BCRYPT_MAX_PASSWORD_BYTES) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password must not exceed 72 UTF-8 bytes");
+        }
+
         if (usersRepository.existsByEmail(email)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Email is already registered");
         }
@@ -63,12 +71,21 @@ public class AuthService {
                 Roles.USER
         );
 
-        return UserResponse.response(usersRepository.save(user));
+        try {
+            return UserResponse.response(usersRepository.save(user));
+        } catch (DataIntegrityViolationException exception) {
+            // A restrição UNIQUE do banco também impede duplicidade em cadastros simultâneos.
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email is already registered", exception);
+        }
     } // end of register method
 
     // Login validates the credentials, then issues a signed token with the user's role.
     public AuthResponse login(LoginRequest request) {
         String email = normalizeEmail(request.email());
+
+        if (request.password().getBytes(StandardCharsets.UTF_8).length > BCRYPT_MAX_PASSWORD_BYTES) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password");
+        }
 
         try {
             authenticationManager.authenticate(

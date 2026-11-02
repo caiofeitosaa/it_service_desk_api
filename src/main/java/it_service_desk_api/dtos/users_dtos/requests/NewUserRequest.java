@@ -14,6 +14,6 @@ public record NewUserRequest (
         String email,
 
         @NotBlank (message = "Please enter your password")
-        @Size (min = 8, message = "Password must contain at least 8 characters")
+        @Size (min = 8, max = 72, message = "Password must contain between 8 and 72 characters")
         String password
 ) {}
